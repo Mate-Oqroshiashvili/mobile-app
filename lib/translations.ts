@@ -1,0 +1,82 @@
+export const T = {
+  en: {
+    // ლოგინი & რეგისტრაცია
+    login_title: "STEP IT Academy",
+    login_subtitle: "Access your account",
+    email: "Email",
+    password: "Password",
+    login_btn: "Sign In →",
+    no_account: "Don't have an account? ",
+    register_link: "Register",
+    email_error: "Invalid email or password",
+    error: "Error",
+    lang_switch: "🇬🇪 ქართ",
+    
+    // მთავარი გვერდი (Home)
+    greeting: "Welcome to STEP 👋",
+    admin_role: "⚙️ Academy Administration",
+    student_role: "🎓 IT Student",
+    campus_stats: "Campus Statistics",
+    my_attendance: "My Attendance",
+    today: "Today",
+    allowed: "Allowed",
+    duplicate: "Duplicate (⚠️)",
+    denied: "Denied",
+    navigation: "Navigation",
+    logout: "Log Out",
+    logout_msg: "Are you sure you want to log out?",
+    cancel: "Cancel",
+
+    // ნავიგაციის ქარდები
+    nav_scan_title: "MyStat Access (QR)",
+    nav_scan_sub: "Campus entry QR code",
+    nav_profile_title: "My Profile",
+    nav_profile_sub: "Personal info & rating",
+    nav_academy_title: "Study Programs",
+    nav_academy_sub: "STEP IT Academy courses",
+    nav_gen_title: "Generate QR",
+    nav_gen_sub: "Create new entry code",
+    nav_logs_title: "Logs History",
+    nav_logs_sub: "Global attendance control",
+  },
+  ka: {
+    // ლოგინი & რეგისტრაცია
+    login_title: "STEP IT Academy",
+    login_subtitle: "შედი შენს ანგარიშში",
+    email: "იმეილი",
+    password: "პაროლი",
+    login_btn: "შესვლა →",
+    no_account: "ანგარიში არ გაქვს? ",
+    register_link: "რეგისტრაცია",
+    email_error: "იმეილი ან პაროლი არასწორია",
+    error: "შეცდომა",
+    lang_switch: "🇬🇧 Eng",
+
+    // მთავარი გვერდი (Home)
+    greeting: "მოგესალმებით STEP-ში 👋",
+    admin_role: "⚙️ აკადემიის ადმინისტრაცია",
+    student_role: "🎓 IT სტუდენტი",
+    campus_stats: "კამპუსის სტატისტიკა",
+    my_attendance: "ჩემი დასწრება",
+    today: "დღეს",
+    allowed: "დაშვებული",
+    duplicate: "გამეორება (⚠️)",
+    denied: "უარყოფილი",
+    navigation: "ნავიგაცია",
+    logout: "სისტემიდან გასვლა",
+    logout_msg: "ნამდვილად გსურთ ანგარიშიდან გასვლა?",
+    cancel: "გაუქმება",
+
+    // ნავიგაციის ქარდები
+    nav_scan_title: "MyStat წვდომა (QR)",
+    nav_scan_sub: "კამპუსში შესვლის QR კოდი",
+    nav_profile_title: "ჩემი პროფილი",
+    nav_profile_sub: "პერსონალური ინფორმაცია",
+    nav_academy_title: "სასწავლო პროგრამები",
+    nav_academy_sub: "STEP IT Academy-ს კურსები",
+    nav_gen_title: "QR-ის გენერაცია",
+    nav_gen_sub: "ახალი კოდის დაგენერირება",
+    nav_logs_title: "ლოგების ისტორია",
+    nav_logs_sub: "სტუდენტების საერთო დასწრება",
+  }
+};

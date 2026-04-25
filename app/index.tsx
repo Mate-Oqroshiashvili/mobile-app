@@ -1,16 +1,16 @@
 import { useCallback, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator,
-  ScrollView, Animated, Image, Dimensions
+  ScrollView, Animated, Image, Dimensions, Alert
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { getCurrentUserId, clearCurrentUserId } from "@/lib/session";
 import { getUserById, User, getRecentLogs } from "@/lib/db";
+import { useLanguage } from "@/lib/LanguageContext";
 
 const { width } = Dimensions.get("window");
 const SLIDER_ITEM_WIDTH = width - 40;
 
-// 📸 ინტერიერის სლაიდერი
 function ImageSlider() {
   const sliderImages = [
     require("@/assets/images/1.png"),
@@ -21,15 +21,9 @@ function ImageSlider() {
 
   return (
     <View style={styles.sliderContainer}>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        snapToInterval={SLIDER_ITEM_WIDTH + 16} 
-        decelerationRate="fast" 
-        contentContainerStyle={styles.sliderContent}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={SLIDER_ITEM_WIDTH + 16} decelerationRate="fast" contentContainerStyle={styles.sliderContent}>
         {sliderImages.map((img, index) => (
-          <View key={index} style={styles.slideWrap}>
+          <View key={String(index)} style={styles.slideWrap}>
             <Image source={img} style={styles.slideImage} resizeMode="cover" />
             <View style={styles.slideOverlay} />
           </View>
@@ -69,6 +63,9 @@ export default function HomeScreen() {
   const [stats, setStats] = useState({ today: 0, total: 0, allowed: 0, duplicate: 0, denied: 0 });
   const router = useRouter();
 
+  const { t, lang, setLang } = useLanguage();
+  const toggleLanguage = () => setLang(lang === 'ka' ? 'en' : 'ka');
+
   const headerAnim = useRef(new Animated.Value(0)).current;
   const statsAnim  = useRef(new Animated.Value(0)).current;
   const cardAnims  = useRef<Animated.Value[]>([]).current;
@@ -84,9 +81,6 @@ export default function HomeScreen() {
         if (isActive) setUser(u);
 
         const logs = await getRecentLogs(500);
-        
-        // 🛑 მთავარი შესწორება: ახლა რელევანტური ლოგები ყოველთვის მხოლოდ მიმდინარე მომხმარებლისაა (მისივე ID-ით)
-        // არ აქვს მნიშვნელობა ის ადმინია თუ სტუდენტი, მთავარ გვერდზე გამოჩნდება მხოლოდ *მისი* დასკანერებები
         const personalLogs = logs.filter(l => l.user_id === id);
         const todayStr = new Date().toISOString().slice(0, 10);
         
@@ -120,17 +114,35 @@ export default function HomeScreen() {
     }, [loading])
   );
 
+  const handleLogout = () => {
+    Alert.alert(
+      t('logout'), 
+      t('logout_msg'), 
+      [
+        { text: t('cancel'), style: "cancel" },
+        { 
+          text: t('logout'), 
+          style: "destructive", 
+          onPress: async () => {
+            await clearCurrentUserId();
+            router.replace("/login");
+          }
+        }
+      ]
+    );
+  };
+
   if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#0ea5e9" /></View>;
 
-  const initials = user?.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  const initials = user?.name ? user.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) : "";
 
   const actions = [
-    { emoji: "📷", title: "MyStat წვდომა (QR)",   subtitle: "კამპუსში შესვლის QR კოდი",    color: "#0ea5e9", route: "/scan"     }, 
-    { emoji: "👤", title: "ჩემი პროფილი",        subtitle: "პერსონალური ინფორმაცია",      color: "#f59e0b", route: "/profile"  }, 
-    { emoji: "🏛️", title: "სასწავლო პროგრამები", subtitle: "STEP IT Academy-ს კურსები",   color: "#8b5cf6", route: "/academy"  },
+    { emoji: "📷", title: t('nav_scan_title'),   subtitle: t('nav_scan_sub'),    color: "#0ea5e9", route: "/scan"     }, 
+    { emoji: "👤", title: t('nav_profile_title'),subtitle: t('nav_profile_sub'), color: "#f59e0b", route: "/profile"  }, 
+    { emoji: "🏛️", title: t('nav_academy_title'),subtitle: t('nav_academy_sub'), color: "#8b5cf6", route: "/academy"  },
     ...(user?.role === "admin" ? [
-      { emoji: "🔑", title: "QR-ის გენერაცია", subtitle: "ახალი კოდის დაგენერირება",    color: "#f43f5e", route: "/generate" },
-      { emoji: "📋", title: "ლოგების ისტორია", subtitle: "სტუდენტების საერთო დასწრება", color: "#10b981", route: "/logs"     },
+      { emoji: "🔑", title: t('nav_gen_title'),  subtitle: t('nav_gen_sub'),     color: "#f43f5e", route: "/generate" },
+      { emoji: "📋", title: t('nav_logs_title'), subtitle: t('nav_logs_sub'),    color: "#10b981", route: "/logs"     },
     ] : []),
   ];
 
@@ -138,17 +150,24 @@ export default function HomeScreen() {
     <ScrollView style={styles.mainScroll} contentContainerStyle={styles.container}>
       <Animated.View style={[styles.header, { opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }] }]}>
         <View>
-          <Text style={styles.greeting}>მოგესალმებით STEP-ში 👋</Text>
+          <Text style={styles.greeting}>{t('greeting')}</Text>
           <Text style={styles.username}>{user?.name}</Text>
         </View>
-        <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </Pressable>
+        
+        <View style={styles.headerRight}>
+          <Pressable style={styles.langBtn} onPress={toggleLanguage}>
+            <Text style={styles.langBtnText}>{lang === 'ka' ? '🇬🇧 EN' : '🇬🇪 KA'}</Text>
+          </Pressable>
+
+          <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </Pressable>
+        </View>
       </Animated.View>
 
       <Animated.View style={{ opacity: headerAnim }}>
         <View style={[styles.roleBadge, user?.role === "admin" ? styles.adminBadge : styles.userBadge]}>
-          <Text style={styles.roleText}>{user?.role === "admin" ? "⚙️ აკადემიის ადმინისტრაცია" : "🎓 IT სტუდენტი"}</Text>
+          <Text style={styles.roleText}>{user?.role === "admin" ? t('admin_role') : t('student_role')}</Text>
         </View>
       </Animated.View>
 
@@ -157,14 +176,13 @@ export default function HomeScreen() {
       </Animated.View>
 
       <Animated.View style={{ opacity: statsAnim, transform: [{ translateY: statsAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
-        {/* სათაურიც შეიცვალა, რადგან ახლა ყველასთვის პერსონალურია */}
-        <Text style={styles.sectionTitle}>ჩემი დასწრება</Text>
+        <Text style={styles.sectionTitle}>{user?.role === "admin" ? t('campus_stats') : t('my_attendance')}</Text>
         <View style={styles.statsGrid}>
           {[
-            { label: "დღეს", value: stats.today, color: "#0ea5e9" },
-            { label: "დაშვებული", value: stats.allowed, color: "#10b981" },
-            { label: "გამეორება (⚠️)", value: stats.duplicate, color: "#f59e0b" },
-            { label: "უარყოფილი", value: stats.denied, color: "#ef4444" },
+            { label: t('today'), value: stats.today, color: "#0ea5e9" },
+            { label: t('allowed'), value: stats.allowed, color: "#10b981" },
+            { label: t('duplicate'), value: stats.duplicate, color: "#f59e0b" },
+            { label: t('denied'), value: stats.denied, color: "#ef4444" },
           ].map(s => (
             <View key={s.label} style={[styles.statBox, { borderLeftColor: s.color }]}>
               <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
@@ -174,15 +192,15 @@ export default function HomeScreen() {
         </View>
       </Animated.View>
 
-      <Text style={styles.sectionTitle}>ნავიგაცია</Text>
+      <Text style={styles.sectionTitle}>{t('navigation')}</Text>
       <View style={styles.actionsContainer}>
         {actions.map((a, i) => (
           <ActionCard key={a.route} emoji={a.emoji} title={a.title} subtitle={a.subtitle} color={a.color} onPress={() => router.push(a.route as any)} anim={cardAnims[i] ?? new Animated.Value(1)} />
         ))}
       </View>
 
-      <Pressable style={styles.logoutBtn} onPress={async () => { await clearCurrentUserId(); router.replace("/login"); }}>
-        <Text style={styles.logoutText}>🚪 სისტემიდან გასვლა</Text>
+      <Pressable style={styles.logoutBtn} onPress={handleLogout}>
+        <Text style={styles.logoutText}>🚪 {t('logout')}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -192,11 +210,18 @@ const styles = StyleSheet.create({
   mainScroll:      { flex: 1, backgroundColor: "#0f172a" },
   container:       { padding: 20, paddingTop: 60, paddingBottom: 40 },
   centered:        { flex: 1, backgroundColor: "#0f172a", justifyContent: "center", alignItems: "center" },
+  
   header:          { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   greeting:        { color: "#94a3b8", fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5 },
   username:        { color: "white", fontSize: 22, fontWeight: "800", letterSpacing: -0.3, marginTop: 2 },
+  
+  headerRight:     { flexDirection: "row", alignItems: "center", gap: 12 },
+  langBtn:         { paddingHorizontal: 10, paddingVertical: 8, backgroundColor: "#1e293b", borderRadius: 10, borderWidth: 1, borderColor: "#334155" },
+  langBtnText:     { color: "#e2e8f0", fontSize: 12, fontWeight: "700" },
+  
   avatar:          { width: 46, height: 46, borderRadius: 23, backgroundColor: "#0ea5e9", justifyContent: "center", alignItems: "center" },
   avatarText:      { color: "white", fontWeight: "800", fontSize: 16 },
+  
   roleBadge:       { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginBottom: 20 },
   adminBadge:      { backgroundColor: "#f43f5e18", borderWidth: 1, borderColor: "#f43f5e55" },
   userBadge:       { backgroundColor: "#0ea5e918", borderWidth: 1, borderColor: "#0ea5e955" },

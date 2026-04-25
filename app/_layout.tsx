@@ -1,9 +1,10 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { LanguageProvider } from "@/lib/LanguageContext";
 
 export default function RootLayout() {
   return (
-    <>
+    <LanguageProvider>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: "#0f172a" },
@@ -12,6 +13,6 @@ export default function RootLayout() {
         }}
       />
       <StatusBar style="light" />
-    </>
+    </LanguageProvider>
   );
 }
