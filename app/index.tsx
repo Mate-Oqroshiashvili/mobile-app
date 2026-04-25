@@ -1,82 +1,224 @@
-import { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
-import { useRouter, Link } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import {
+  View, Text, StyleSheet, Pressable, ActivityIndicator,
+  ScrollView, Animated, Image, Dimensions
+} from "react-native";
+import { useRouter, useFocusEffect } from "expo-router";
 import { getCurrentUserId, clearCurrentUserId } from "@/lib/session";
-import { getUserById, User } from "@/lib/db";
+import { getUserById, User, getRecentLogs } from "@/lib/db";
 
-export default function HomeScreen() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+const { width } = Dimensions.get("window");
+const SLIDER_ITEM_WIDTH = width - 40;
 
-  useEffect(() => {
-    (async () => {
-      const id = await getCurrentUserId();
-      if (!id) return router.replace("/login");
-      const u = await getUserById(id);
-      if (!u) {
-        await clearCurrentUserId();
-        return router.replace("/login");
-      }
-      setUser(u);
-      setLoading(false);
-    })();
-  }, []);
-
-  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#2563eb" /></View>;
+// 📸 ინტერიერის სლაიდერი
+function ImageSlider() {
+  const sliderImages = [
+    require("@/assets/images/1.png"),
+    require("@/assets/images/3.png"),
+    require("@/assets/images/4.png"),
+    require("@/assets/images/5.png"),
+  ];
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.welcome}>გამარჯობა, {user?.name}!</Text>
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{user?.role?.toUpperCase()}</Text>
-      </View>
-      
-      <View style={styles.actionsContainer}>
-        <Link href="/scan" asChild>
-          <Pressable style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>QR კოდის დასკანერება</Text>
-          </Pressable>
-        </Link>
-
-        {user?.role === "admin" && (
-          <>
-            <Link href="/generate" asChild>
-              <Pressable style={[styles.actionBtn, styles.adminBtn]}>
-                <Text style={styles.actionBtnText}>QR-ის გენერაცია</Text>
-              </Pressable>
-            </Link>
-            <Link href="/logs" asChild>
-              <Pressable style={[styles.actionBtn, styles.adminBtn]}>
-                <Text style={styles.actionBtnText}>სკანირების ისტორია</Text>
-              </Pressable>
-            </Link>
-          </>
-        )}
-      </View>
-
-      <Pressable style={styles.logoutBtn} onPress={async () => {
-        await clearCurrentUserId();
-        router.replace("/login");
-      }}>
-        <Text style={styles.logoutText}>გამოსვლა</Text>
-      </Pressable>
+    <View style={styles.sliderContainer}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        snapToInterval={SLIDER_ITEM_WIDTH + 16} 
+        decelerationRate="fast" 
+        contentContainerStyle={styles.sliderContent}
+      >
+        {sliderImages.map((img, index) => (
+          <View key={index} style={styles.slideWrap}>
+            <Image source={img} style={styles.slideImage} resizeMode="cover" />
+            <View style={styles.slideOverlay} />
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f172a", alignItems: "center", padding: 20, paddingTop: 60 },
-  centered: { flex: 1, backgroundColor: "#0f172a", justifyContent: "center", alignItems: "center" },
-  welcome: { color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 10 },
-  badge: { backgroundColor: "#2563eb", paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 40 },
-  badgeText: { color: "white", fontSize: 12, fontWeight: "bold" },
-  
-  actionsContainer: { width: "100%", gap: 15 },
-  actionBtn: { backgroundColor: "#22c55e", padding: 18, borderRadius: 12, alignItems: "center", width: "100%" },
-  adminBtn: { backgroundColor: "#475569" },
-  actionBtnText: { color: "white", fontWeight: "bold", fontSize: 16 },
+function ActionCard({ emoji, title, subtitle, color, onPress, anim }: {
+  emoji: string; title: string; subtitle: string;
+  color: string; onPress: () => void; anim: Animated.Value;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn  = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1,    useNativeDriver: true, speed: 20 }).start();
 
-  logoutBtn: { marginTop: "auto", marginBottom: 30, padding: 15 },
-  logoutText: { color: "#ef4444", fontWeight: "bold", fontSize: 16 }
+  return (
+    <Animated.View style={{ opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }, { scale }] }}>
+      <Pressable style={styles.actionCard} onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
+        <View style={[styles.actionIcon, { backgroundColor: color + "20" }]}>
+          <Text style={{ fontSize: 24 }}>{emoji}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.actionTitle}>{title}</Text>
+          <Text style={styles.actionSubtitle}>{subtitle}</Text>
+        </View>
+        <Text style={[styles.chevron, { color }]}>›</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+export default function HomeScreen() {
+  const [user, setUser]           = useState<User | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [stats, setStats] = useState({ today: 0, total: 0, allowed: 0, duplicate: 0, denied: 0 });
+  const router = useRouter();
+
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const statsAnim  = useRef(new Animated.Value(0)).current;
+  const cardAnims  = useRef<Animated.Value[]>([]).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      (async () => {
+        const id = await getCurrentUserId();
+        if (!id) { if (isActive) router.replace("/login"); return; }
+        const u = await getUserById(id);
+        if (!u) { await clearCurrentUserId(); if (isActive) router.replace("/login"); return; }
+        if (isActive) setUser(u);
+
+        const logs = await getRecentLogs(500);
+        
+        // 🛑 მთავარი შესწორება: ახლა რელევანტური ლოგები ყოველთვის მხოლოდ მიმდინარე მომხმარებლისაა (მისივე ID-ით)
+        // არ აქვს მნიშვნელობა ის ადმინია თუ სტუდენტი, მთავარ გვერდზე გამოჩნდება მხოლოდ *მისი* დასკანერებები
+        const personalLogs = logs.filter(l => l.user_id === id);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        
+        if (isActive) {
+          setStats({
+            today: personalLogs.filter(l => l.scanned_date === todayStr).length,
+            total: personalLogs.length,
+            allowed: personalLogs.filter(l => l.result === "allowed").length,
+            duplicate: personalLogs.filter(l => l.result === "duplicate").length,
+            denied: personalLogs.filter(l => l.result !== "allowed" && l.result !== "duplicate").length
+          });
+          setLoading(false);
+        }
+      })();
+      return () => { isActive = false; };
+    }, [])
+  );
+
+  const numCards = user?.role === "admin" ? 5 : 3;
+  while (cardAnims.length < numCards) cardAnims.push(new Animated.Value(0));
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        Animated.sequence([
+          Animated.timing(headerAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(statsAnim,  { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.stagger(80, cardAnims.map(a => Animated.spring(a, { toValue: 1, useNativeDriver: true, tension: 60, friction: 9 }))),
+        ]).start();
+      }
+    }, [loading])
+  );
+
+  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#0ea5e9" /></View>;
+
+  const initials = user?.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+  const actions = [
+    { emoji: "📷", title: "MyStat წვდომა (QR)",   subtitle: "კამპუსში შესვლის QR კოდი",    color: "#0ea5e9", route: "/scan"     }, 
+    { emoji: "👤", title: "ჩემი პროფილი",        subtitle: "პერსონალური ინფორმაცია",      color: "#f59e0b", route: "/profile"  }, 
+    { emoji: "🏛️", title: "სასწავლო პროგრამები", subtitle: "STEP IT Academy-ს კურსები",   color: "#8b5cf6", route: "/academy"  },
+    ...(user?.role === "admin" ? [
+      { emoji: "🔑", title: "QR-ის გენერაცია", subtitle: "ახალი კოდის დაგენერირება",    color: "#f43f5e", route: "/generate" },
+      { emoji: "📋", title: "ლოგების ისტორია", subtitle: "სტუდენტების საერთო დასწრება", color: "#10b981", route: "/logs"     },
+    ] : []),
+  ];
+
+  return (
+    <ScrollView style={styles.mainScroll} contentContainerStyle={styles.container}>
+      <Animated.View style={[styles.header, { opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }] }]}>
+        <View>
+          <Text style={styles.greeting}>მოგესალმებით STEP-ში 👋</Text>
+          <Text style={styles.username}>{user?.name}</Text>
+        </View>
+        <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
+          <Text style={styles.avatarText}>{initials}</Text>
+        </Pressable>
+      </Animated.View>
+
+      <Animated.View style={{ opacity: headerAnim }}>
+        <View style={[styles.roleBadge, user?.role === "admin" ? styles.adminBadge : styles.userBadge]}>
+          <Text style={styles.roleText}>{user?.role === "admin" ? "⚙️ აკადემიის ადმინისტრაცია" : "🎓 IT სტუდენტი"}</Text>
+        </View>
+      </Animated.View>
+
+      <Animated.View style={{ opacity: headerAnim }}>
+        <ImageSlider />
+      </Animated.View>
+
+      <Animated.View style={{ opacity: statsAnim, transform: [{ translateY: statsAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+        {/* სათაურიც შეიცვალა, რადგან ახლა ყველასთვის პერსონალურია */}
+        <Text style={styles.sectionTitle}>ჩემი დასწრება</Text>
+        <View style={styles.statsGrid}>
+          {[
+            { label: "დღეს", value: stats.today, color: "#0ea5e9" },
+            { label: "დაშვებული", value: stats.allowed, color: "#10b981" },
+            { label: "გამეორება (⚠️)", value: stats.duplicate, color: "#f59e0b" },
+            { label: "უარყოფილი", value: stats.denied, color: "#ef4444" },
+          ].map(s => (
+            <View key={s.label} style={[styles.statBox, { borderLeftColor: s.color }]}>
+              <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
+              <Text style={styles.statLabel}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+
+      <Text style={styles.sectionTitle}>ნავიგაცია</Text>
+      <View style={styles.actionsContainer}>
+        {actions.map((a, i) => (
+          <ActionCard key={a.route} emoji={a.emoji} title={a.title} subtitle={a.subtitle} color={a.color} onPress={() => router.push(a.route as any)} anim={cardAnims[i] ?? new Animated.Value(1)} />
+        ))}
+      </View>
+
+      <Pressable style={styles.logoutBtn} onPress={async () => { await clearCurrentUserId(); router.replace("/login"); }}>
+        <Text style={styles.logoutText}>🚪 სისტემიდან გასვლა</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  mainScroll:      { flex: 1, backgroundColor: "#0f172a" },
+  container:       { padding: 20, paddingTop: 60, paddingBottom: 40 },
+  centered:        { flex: 1, backgroundColor: "#0f172a", justifyContent: "center", alignItems: "center" },
+  header:          { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  greeting:        { color: "#94a3b8", fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5 },
+  username:        { color: "white", fontSize: 22, fontWeight: "800", letterSpacing: -0.3, marginTop: 2 },
+  avatar:          { width: 46, height: 46, borderRadius: 23, backgroundColor: "#0ea5e9", justifyContent: "center", alignItems: "center" },
+  avatarText:      { color: "white", fontWeight: "800", fontSize: 16 },
+  roleBadge:       { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginBottom: 20 },
+  adminBadge:      { backgroundColor: "#f43f5e18", borderWidth: 1, borderColor: "#f43f5e55" },
+  userBadge:       { backgroundColor: "#0ea5e918", borderWidth: 1, borderColor: "#0ea5e955" },
+  roleText:        { color: "#e2e8f0", fontSize: 12, fontWeight: "600" },
+  
+  sliderContainer: { marginBottom: 28, marginHorizontal: -20 },
+  sliderContent:   { paddingHorizontal: 20, gap: 16 },
+  slideWrap:       { width: SLIDER_ITEM_WIDTH, height: 180, borderRadius: 16, overflow: "hidden", backgroundColor: "#1e293b", borderWidth: 1, borderColor: "#334155" },
+  slideImage:      { width: "100%", height: "100%" },
+  slideOverlay:    { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.2)" },
+
+  sectionTitle:    { color: "#475569", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 },
+  statsGrid:       { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
+  statBox:         { width: "48%", backgroundColor: "#1e293b", borderRadius: 14, padding: 16, borderLeftWidth: 3 },
+  statValue:       { fontSize: 28, fontWeight: "800" },
+  statLabel:       { color: "#64748b", fontSize: 11, marginTop: 4, fontWeight: "600" },
+  actionsContainer:{ gap: 10, marginBottom: 32 },
+  actionCard:      { backgroundColor: "#1e293b", borderRadius: 16, padding: 18, flexDirection: "row", alignItems: "center", gap: 16, borderWidth: 1, borderColor: "#ffffff08" },
+  actionIcon:      { width: 50, height: 50, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  actionTitle:     { color: "white", fontSize: 15, fontWeight: "700" },
+  actionSubtitle:  { color: "#64748b", fontSize: 12, marginTop: 2 },
+  chevron:         { fontSize: 22 },
+  logoutBtn:       { padding: 16, alignItems: "center" },
+  logoutText:      { color: "#ef4444", fontWeight: "600", fontSize: 15 },
 });
