@@ -1,50 +1,44 @@
-import { getAllUsers } from "@/lib/db";
+import { useState } from "react";
+import { View, TextInput, StyleSheet, Text, Pressable, Alert } from "react-native";
+import { useRouter } from "expo-router";
+import { loginUser } from "@/lib/db";
 import { setCurrentUserId } from "@/lib/session";
-import type { User } from "@/lib/users";
-import { Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
 
-  useEffect(() => {
-    getAllUsers().then(setUsers);
-  }, []);
-
-  const pick = async (u: User) => {
-    await setCurrentUserId(u.id);
-    router.replace("/");
+  const handleLogin = async () => {
+    const user = await loginUser(email, password);
+    if (user) {
+      await setCurrentUserId(user.id);
+      router.replace("/");
+    } else {
+      Alert.alert("შეცდომა", "იმეილი ან პაროლი არასწორია");
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: "Pick user" }} />
-      <Text style={styles.title}>Who are you?</Text>
-      <Text style={styles.subtitle}>
-        (temporary — replaced by real login later)
-      </Text>
-      <FlatList
-        data={users}
-        keyExtractor={(u) => u.id}
-        contentContainerStyle={{ gap: 12, paddingTop: 16 }}
-        renderItem={({ item }) => (
-          <Pressable style={styles.item} onPress={() => pick(item)}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.email}>{item.email}</Text>
-          </Pressable>
-        )}
-      />
+      <Text style={styles.title}>ავტორიზაცია</Text>
+      <TextInput placeholder="იმეილი" style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholderTextColor="#64748b" />
+      <TextInput placeholder="პაროლი" style={styles.input} value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor="#64748b" />
+      <Pressable style={styles.button} onPress={handleLogin}>
+        <Text style={styles.btnText}>შესვლა</Text>
+      </Pressable>
+      <Pressable onPress={() => router.push("/register")} style={{marginTop: 20}}>
+        <Text style={styles.link}>რეგისტრაცია</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  title: { color: "white", fontSize: 24, fontWeight: "700" },
-  subtitle: { color: "#94a3b8", fontSize: 13 },
-  item: { backgroundColor: "#1e293b", padding: 18, borderRadius: 12 },
-  name: { color: "white", fontSize: 17, fontWeight: "600" },
-  email: { color: "#94a3b8", fontSize: 13, marginTop: 4 },
+  container: { flex: 1, padding: 24, justifyContent: "center", backgroundColor: "#0f172a" },
+  title: { color: "white", fontSize: 28, fontWeight: "bold", marginBottom: 40, textAlign: "center" },
+  input: { backgroundColor: "#1e293b", color: "white", padding: 18, borderRadius: 12, marginBottom: 15 },
+  button: { backgroundColor: "#2563eb", padding: 20, borderRadius: 12, alignItems: "center" },
+  btnText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  link: { color: "#94a3b8", textAlign: "center" }
 });

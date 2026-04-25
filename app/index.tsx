@@ -1,101 +1,82 @@
-import { getUserById } from "@/lib/db";
-import { clearCurrentUserId, getCurrentUserId } from "@/lib/session";
-import type { User } from "@/lib/users";
-import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { useRouter, Link } from "expo-router";
+import { getCurrentUserId, clearCurrentUserId } from "@/lib/session";
+import { getUserById, User } from "@/lib/db";
 
 export default function HomeScreen() {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      (async () => {
-        const id = await getCurrentUserId();
-        if (!id) {
-          router.replace("/login");
-          return;
-        }
-        const u = await getUserById(id);
-        if (active) {
-          setUser(u);
-          setLoading(false);
-        }
-      })();
-      return () => {
-        active = false;
-      };
-    }, [router]),
-  );
+  useEffect(() => {
+    (async () => {
+      const id = await getCurrentUserId();
+      if (!id) return router.replace("/login");
+      const u = await getUserById(id);
+      if (!u) {
+        await clearCurrentUserId();
+        return router.replace("/login");
+      }
+      setUser(u);
+      setLoading(false);
+    })();
+  }, []);
 
-  if (loading)
-    return (
-      <View style={styles.container}>
-        <Text style={{ color: "white" }}>Loading…</Text>
-      </View>
-    );
+  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#2563eb" /></View>;
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: "Academy Check-In" }} />
-      <Text style={styles.greeting}>Hello, {user?.name}</Text>
-      <Text style={styles.email}>{user?.email}</Text>
-      <View style={styles.buttons}>
-        <Btn
-          label="📷  Scan turnstile QR"
-          color="#2563eb"
-          onPress={() => router.push("/scan")}
-        />
-        <Btn
-          label="🔳  Generate QR (admin)"
-          color="#0891b2"
-          onPress={() => router.push("/generate")}
-        />
-        <Btn
-          label="📋  Scan history"
-          color="#7c3aed"
-          onPress={() => router.push("/logs")}
-        />
-        <Btn
-          label="🚪  Switch user"
-          color="#475569"
-          onPress={async () => {
-            await clearCurrentUserId();
-            router.replace("/login");
-          }}
-        />
+      <Text style={styles.welcome}>გამარჯობა, {user?.name}!</Text>
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>{user?.role?.toUpperCase()}</Text>
       </View>
+      
+      <View style={styles.actionsContainer}>
+        <Link href="/scan" asChild>
+          <Pressable style={styles.actionBtn}>
+            <Text style={styles.actionBtnText}>QR კოდის დასკანერება</Text>
+          </Pressable>
+        </Link>
+
+        {user?.role === "admin" && (
+          <>
+            <Link href="/generate" asChild>
+              <Pressable style={[styles.actionBtn, styles.adminBtn]}>
+                <Text style={styles.actionBtnText}>QR-ის გენერაცია</Text>
+              </Pressable>
+            </Link>
+            <Link href="/logs" asChild>
+              <Pressable style={[styles.actionBtn, styles.adminBtn]}>
+                <Text style={styles.actionBtnText}>სკანირების ისტორია</Text>
+              </Pressable>
+            </Link>
+          </>
+        )}
+      </View>
+
+      <Pressable style={styles.logoutBtn} onPress={async () => {
+        await clearCurrentUserId();
+        router.replace("/login");
+      }}>
+        <Text style={styles.logoutText}>გამოსვლა</Text>
+      </Pressable>
     </View>
   );
 }
 
-function Btn({
-  label,
-  color,
-  onPress,
-}: {
-  label: string;
-  color: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={[styles.button, { backgroundColor: color }]}
-      onPress={onPress}
-    >
-      <Text style={styles.buttonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: "center" },
-  greeting: { color: "white", fontSize: 28, fontWeight: "700" },
-  email: { color: "#94a3b8", fontSize: 14, marginBottom: 32 },
-  buttons: { gap: 12 },
-  button: { padding: 18, borderRadius: 12 },
-  buttonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  container: { flex: 1, backgroundColor: "#0f172a", alignItems: "center", padding: 20, paddingTop: 60 },
+  centered: { flex: 1, backgroundColor: "#0f172a", justifyContent: "center", alignItems: "center" },
+  welcome: { color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 10 },
+  badge: { backgroundColor: "#2563eb", paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 40 },
+  badgeText: { color: "white", fontSize: 12, fontWeight: "bold" },
+  
+  actionsContainer: { width: "100%", gap: 15 },
+  actionBtn: { backgroundColor: "#22c55e", padding: 18, borderRadius: 12, alignItems: "center", width: "100%" },
+  adminBtn: { backgroundColor: "#475569" },
+  actionBtnText: { color: "white", fontWeight: "bold", fontSize: 16 },
+
+  logoutBtn: { marginTop: "auto", marginBottom: 30, padding: 15 },
+  logoutText: { color: "#ef4444", fontWeight: "bold", fontSize: 16 }
 });
