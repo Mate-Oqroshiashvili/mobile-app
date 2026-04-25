@@ -1,6 +1,6 @@
-import { getUserById } from "@/libs/db";
-import { clearCurrentUserId, getCurrentUserId } from "@/libs/session";
-import type { User } from "@/libs/users";
+import { getUserById } from "@/lib/db";
+import { clearCurrentUserId, getCurrentUserId } from "@/lib/session";
+import type { User } from "@/lib/users";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";

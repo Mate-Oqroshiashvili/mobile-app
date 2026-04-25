@@ -1,6 +1,6 @@
-import { getAllUsers } from "@/libs/db";
-import { setCurrentUserId } from "@/libs/session";
-import type { User } from "@/libs/users";
+import { getAllUsers } from "@/lib/db";
+import { setCurrentUserId } from "@/lib/session";
+import type { User } from "@/lib/users";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";

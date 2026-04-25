@@ -1,5 +1,5 @@
-import { getAllUsers, getRecentLogs, type ScanLog } from "@/libs/db";
-import type { User } from "@/libs/users";
+import { getAllUsers, getRecentLogs, type ScanLog } from "@/lib/db";
+import type { User } from "@/lib/users";
 import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";

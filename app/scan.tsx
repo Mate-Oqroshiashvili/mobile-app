@@ -1,6 +1,6 @@
-import { findAllowedScanForToday, getUserById, insertScanLog } from "@/libs/db";
-import { decodePayload, todayLocalYYYYMMDD } from "@/libs/qrcode";
-import { getCurrentUserId } from "@/libs/session";
+import { findAllowedScanForToday, getUserById, insertScanLog } from "@/lib/db";
+import { decodePayload, todayLocalYYYYMMDD } from "@/lib/qrcode";
+import { getCurrentUserId } from "@/lib/session";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";

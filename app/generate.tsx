@@ -1,4 +1,4 @@
-import { encodePayload } from "@/libs/qrcode";
+import { encodePayload } from "@/lib/qrcode";
 import { Stack } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
